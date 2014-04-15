@@ -1,5 +1,0 @@
-*.swp
-*.pyc
-profiles/*
-rrd/*
-rrduino/config.py
