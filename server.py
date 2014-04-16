@@ -1,9 +1,8 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 SERVER_NAME = 'doorbot server'
 SERVER_VERSION = '20140415'
-
-from __future__ import print_function
 
 import os, sys, signal
 import socket
@@ -11,18 +10,18 @@ import hashlib, hmac
 import logging
 import getopt
 
-from server import BaseServer
+from server.BaseServer import BaseServer
 
 def usage():
-    print '{0} (v{1})'.format(SERVER_NAME, SERVER_VERSION)
-    print 'Usage:'
-    print '  {0} [-v|--verbose|-d|--debug]'.format(sys.argv[0])
-    print ''
-    print '  -f, --config    Configuration file path'
-    print '  -v, --verbose   Verbose output'
-    print '  -d, --debug     Very verbose output (DEBUG ONLY)'
-    print '  -h, --help      Show this message.'
-    print ''
+    print('{0} (v{1})'.format(SERVER_NAME, SERVER_VERSION))
+    print('Usage:')
+    print('  {0} [-v|--verbose|-d|--debug]'.format(sys.argv[0]))
+    print('')
+    print('  -f, --config    Configuration file path')
+    print('  -v, --verbose   Verbose output')
+    print('  -d, --debug     Very verbose output (DEBUG ONLY)')
+    print('  -h, --help      Show this message.')
+    print('')
     
 if __name__ == '__main__':  
     # Default parameters
@@ -64,8 +63,6 @@ if __name__ == '__main__':
     # Start the server
     logging.info('{0} (v{1}) running on {2}:{3}'.format(SERVER_NAME, SERVER_VERSION, config['host'], config['port']))
     
-    s = BaseServer(server_config['host'],
-                   server_config['port'],
-                   server_config['handler'])
+    s = BaseServer(config['host'], config['port'])
 
     s.serve_forever()

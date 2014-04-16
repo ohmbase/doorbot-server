@@ -25,8 +25,9 @@ class BaseServer:
 
         # Default session state
         self.DEFAULT_SESSION = {'id'      : None,
-                                'key'     : None, # session key
+                                #'key'     : None, # session key
                                 'handler' : None,
+                                'type'    : None,
                                 'profile' : None}
 
     def serve_forever(self):
