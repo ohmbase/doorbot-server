@@ -1,36 +1,44 @@
 #!/usr/bin/env python
 
+SERVER_NAME = 'doorbot server'
+SERVER_VERSION = '20140415'
+
+from __future__ import print_function
+
 import os, sys, signal
 import socket
 import hashlib, hmac
 import logging
 import getopt
-#import rrdtool
 
-import doorbot
-from doorbot.BaseServer import BaseServer
+from server import BaseServer
 
 def usage():
-    print "doorbot server" 
-    print "Usage:"
-    print "   Running the server:"
-    print "       {0} [-v|--verbose|-d|--debug]".format(sys.argv[0])
-    print ""
-    print "  -v, --verbose   Verbose output"
-    print "  -d, --debug     Very verbose output (DEBUG ONLY)"
-    print "  -h, --help      Show this message."
-    print ""
-    print "See doorbot/config.py for server configuration."
+    print '{0} (v{1})'.format(SERVER_NAME, SERVER_VERSION)
+    print 'Usage:'
+    print '  {0} [-v|--verbose|-d|--debug]'.format(sys.argv[0])
+    print ''
+    print '  -f, --config    Configuration file path'
+    print '  -v, --verbose   Verbose output'
+    print '  -d, --debug     Very verbose output (DEBUG ONLY)'
+    print '  -h, --help      Show this message.'
+    print ''
     
-if __name__ == "__main__":  
+if __name__ == '__main__':  
+    # Default parameters
+    config_path = None
+    config = {
+      'host' : 'localhost',
+      'port' : 60405
+    }
 
     # Get command line options
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-                                   "hvd",
-                                   ["help","verbose","debug"])
+                                   'hvdf',
+                                   ['help','verbose','debug','config'])
     except getopt.GetoptError, err:
-        print str(err)
+        print(str(err), file=sys.stderr)
         usage()
         sys.exit(2)
 
@@ -40,30 +48,24 @@ if __name__ == "__main__":
             logging.basicConfig(level=logging.INFO)
         elif o in ('-d', '--debug'):
             logging.basicConfig(level=logging.NOTSET)
+        elif o in ('-f', '--config'):
+            config_path = a
         elif o in ('-h', '--help'):
             usage()
             sys.exit()
-
-        # Server settings
-        #elif o in ('-h', '--host'):
-        #    doorbot.config.HOST = a
-        #elif o in ('-p', '--port'):
-        #    doorbot.config.PORT = a
-        #elif o in ('--profile-dir'):
-        #    doorbot.config.PROFLIE_DIR = a
-        #elif o in ('--rrds'):
-        #    doorbot.config.RRD_DIR = a
         else:
-            assert False, "Unhandled option: {0}".format(o) 
+            assert False, 'Unhandled option: {0}'.format(o)
 
-    # Make sure our directories exist
-    if not os.path.exists(doorbot.config.PROFILE_DIR):
-        os.makedirs(doorbot.config.PROFILE_DIR)
+    # Load (and verify) server configuration
+    if config_path is not None:
+      with open(config,'r') as fd:
+        config.update(json.load(fd))
 
     # Start the server
-    logging.info("RRDuino server running on {0}:{1}".format(doorbot.config.HOST, doorbot.config.PORT))
-    server = BaseServer(doorbot.config.HOST,
-                        int(doorbot.config.PORT),
-                        doorbot.config.DEFAULT_HANDLER)
+    logging.info('{0} (v{1}) running on {2}:{3}'.format(SERVER_NAME, SERVER_VERSION, config['host'], config['port']))
+    
+    s = BaseServer(server_config['host'],
+                   server_config['port'],
+                   server_config['handler'])
 
-    server.serve_forever()
+    s.serve_forever()

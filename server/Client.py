@@ -2,30 +2,27 @@ import os
 import logging
 import inspect
 import json
-import hashlib
 
-from . import config
 from BaseHandler import BaseHandler
 
 # No need to change unless you've
 # extended the use of the profile.
-DEFAULT_PROFILE = {'key':             None,
-                   'handler':         config.DEFAULT_HANDLER,
-                   'handler_options': { 'path':   None,
-                                        'create': None,
-                                        'update': None }
-                  }
+DEFAULT_PROFILE = {
+  'key':             None,
+  'handler':         BaseHandler,
+  'handler_options': { 'path':   None,
+                       'create': None,
+                       'update': None }
+}
 
 def filename_for(client_id):
     '''Returns the profile filename for a given client_id
     '''
-    #return hashlib.sha256(client_id).hexdigest()
     return str(client_id) + '.json'
 
 def validate(profile):
     '''Validates a profile.
     '''
-
     # Key
     if not profile['key']:
         raise ValueError("A pre-shared key (\"key\") is required.")
@@ -52,25 +49,30 @@ def load(profile_path):
 
     # Convert handler class name from string to a class
     if isinstance(profile['handler'], basestring):
-        profile['handler'] = import_handler_class(profile['handler'])
+        profile['handler'] = import_class(profile['type'])
 
     # Validate profile
     validate(profile)
 
     return profile
 
-
-def import_handler_class(class_name):
-    '''Tries to import rrduino.class_name and returns the handler
-       class of the same name. So, this assumes that class_name.py
-       exists in the rrduino module and class_name.py contains a
-       class of the name class_name.
+def import_class(full_name):
+    '''Imports class from module given full path.
     '''
-    module = __import__('rrduino.{0}'.format(class_name), fromlist = [class_name])
+    module_name, class_name = full_name.rsplit('.', 1)
+    return import_class(module_name, class_name)
+    
+def import_class(module_name, class_name):
+    '''Imports class matching class_name from module matching module_name.
+    '''
+    # Import the module
+    module = importlib.import_module(module_name)
+    
+    # Grab the class
     klass = getattr(module, class_name)
 
-    # Raise an error if this isn't what we expect
-    if not inspect.isclass(klass) or not issubclass(klass, BaseHandler):
-        raise TypeError('{0} is not a {1}-derived class.'.format(class_name, BaseHandler.__name__))
+    # The class should be derived from BaseClientHandler
+    if not inspect.isclass(klass) or not issubclass(klass, BaseClientHandler):
+        raise TypeError('{0} is not a {1}-derived class.'.format(class_name, BaseClientHandler.__name__))
 
     return klass
