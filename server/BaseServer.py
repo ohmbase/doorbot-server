@@ -25,7 +25,7 @@ class BaseServer:
 
         # Default session state
         self.DEFAULT_SESSION = {'id'      : None,
-                                #'key'     : None, # session key
+                                'key'     : None, # session key
                                 'handler' : None,
                                 'type'    : None,
                                 'profile' : None}
@@ -87,7 +87,7 @@ class BaseServer:
                     # it gets loaded on 'hello'). If the session has a profile loaded,
                     # use the profile's specified handler object; instantiate it if
                     # necessary. If the profile is not loaded, use a BaseHandlerClass
-                    # to bootstrap connection.
+                    # to bootstrap connection (i.e. by providing the 'hello' handler).
                     if session['profile']:
                       if session['handler']:
                         handler = session['handler']

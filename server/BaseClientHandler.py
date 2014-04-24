@@ -31,19 +31,20 @@ class BaseClientHandler:
         self.socket = sock
         self.rfile_up()
         self.handlers = {}
-        
+        self.message_uses_hmac = []
+		
         # Register standard messages
-        self.register_message_type('h', self.handle_hello)
+        self.register_message_type('h', self.handle_hello, False)
 
     @classmethod
     def validate_options(cls, opts):
-      ''' Validates optional **kwargs passed to handler. 
+      ''' Validates optional **kwargs passed to the Handler. 
           Should be implemented by derived classes.
           If a derived class wants to pass validations to its base class
           then it should use super() or similar.
       '''
       pass
-
+	  
     def register_message_type(self, message_type, callback):
         """ Registers a handler function for messages beginning with
             'message_type'. Handler functions should accept a single
@@ -70,7 +71,75 @@ class BaseClientHandler:
     #    if not self.wfile.closed:
     #        self.wfile.flush()
     #    self.wfile.close()
+    
+    def verify_hmac(self, message):
+        """ Verifies a message's HMAC. Throws an InvalidRequest on a bad
+            HMAC.
+        """
+        
+        # Split up update request
+        message_parts = message.split(' ')
 
+		if len(message_parts) < 2:
+		    raise InvalidRequest("No HMAC with message which requires it.")
+
+        # Split message into HMAC and canonical string
+        their_hmac = message_parts[-1]
+        canonical_string = ' '.join(x for x in message_parts[:-1])
+
+        # Check HMAC
+        # .. against length
+        if len(their_hmac) != 64:
+            raise InvalidRequest("Malformed HMAC")
+            
+        # .. against HMAC computed here
+        our_hmac = hmac.new(self.session['key'], canonical_string, hashlib.sha256).hexdigest()
+        
+        if our_hmac.lower() != their_hmac.lower():
+            logging.debug("Could not verify HMAC:\n  ours:   {0}\n  theirs: {1}".format(our_hmac, their_hmac))
+            raise InvalidRequest("Bad HMAC")
+        
+    def advance_session_key(self):
+        """ Advances the session key (self.session['key']).
+            Currently this is done by hashing the current session key
+            with the client's master key.
+        """
+        self.session['key'] = hmac.new(self.session['profile']['key'], self.session['key'], hashlib.sha256).digest()
+
+	def initialize_response_hmac(self, data = None):
+        """ Initializes HMAC for response with the current session key
+            (self.session['key']) using optionally supplied `data'.
+        """
+	    self.hmac = hmac.new(self.session['key'], data, hashlib.sha256)
+	  
+	def finalize_response(self, append_hmac = False):
+        """ Send the end-of-message delimiter to the client.
+            If `append_hmac' is true then the handler's HMAC (self.hmac)
+            result is computed and sent followed by the end-of-message
+            delimiter.
+        """
+      
+        if append_hmac:
+            # Send HMAC as last item folloed by end-of-message
+	        self.socket.sendall(" {0}\n".format(self.hmac.hexdigest()))
+            # Advance the session key
+            self.advance_session_key()
+	    else:
+            # Send end-of-message
+	        self.socket.sendall("\n")
+		
+		  
+	def send(self, data, uses_hmac = False):
+        """ Send `data' over `self.socket' (using sendall()).
+            If `uses_hmac' is true then the handler's HMAC state for the
+            message is updated with `data'.
+        """
+      
+	    if uses_hmac:
+	        self.hmac.update(data)
+	  
+	    self.socket.sendall(data)
+        
     def handle_hello(self, data):
         """ Handles the 'hello' message.
             Format: 'hello <client_id>\n'
@@ -84,13 +153,29 @@ class BaseClientHandler:
             logging.debug("Empty client ID")
             raise InvalidRequest("Empty client ID")
 
+		if len(client_id.strip('1234567890qwertyuiopasdfghjklzxcvbnm_')) > 0:
+            raise InvalidRequest("Malformed client ID: {client_id}".format(client_id=client_id))
+	    
         self.session['id'] = client_id
 
         # Load client profile
         self.session['profile'] = client.load_profile_for(client_id)
         self.session['profile']['key'] = self.__hmac(self.session['profile']['key']).digest()
         
-        # FUTURE handshake/authentication
+        # Generate key material and key
+        key_material = os.urandom(32)
+
+        # Send key material for the session
+        self.socket.send(key_material)
+ 
+        logging.debug("key_material={0}".format([key_material]))
+        logging.debug("master_key={0}".format([self.session['profile']['key']]))
+
+        # Generate session key
+        for i in range(self.key_gen_rounds):
+	        key_material = hmac.new(self.session['profile']['key'], key_material, hashlib.sha256).digest()
+
+        self.session['key'] = key_material # (sorry cryptographers)
         
         self.socket.send('Hello, {0}\n'.format(client_id))
 
@@ -110,10 +195,24 @@ class BaseClientHandler:
         if not message:
             raise socket.error("Client disconnected")
 
-        # Split message into the type and the body
-        message_type, message_body = message.split(' ', 1)
+        # Split message into the type and the data(/body)
+        if ' ' in message:
+          message_type, data = message.split(' ', 1)
+        else:
+          message_type = message
+          data = ''
          
-        # FUTURE authenticate message
+        # Authenticate message if required
+        if message_type in self.message_uses_hmac:
+            logging.debug("session_key={0}".format([self.session['key']]))
+            # Verify HMAC
+            self.verify_hmac(message)
+            
+            # Advance key
+            self.advance_session_key()
+            
+            # Remove hmac from data
+            data = data.rsplit(' ', 1)[0]
         
         logging.debug(self.session)
         logging.debug("Received message: {0} {1}".format(message_type, message_body))

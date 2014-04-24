@@ -9,7 +9,7 @@ from BaseHandler import BaseHandler
 # extended the use of the profile.
 DEFAULT_PROFILE = {
   'key':             None,
-  'handler':         BaseHandler,
+  'handler':       'BaseHandler',
   'handler_options': { 'path':   None,
                        'create': None,
                        'update': None }
