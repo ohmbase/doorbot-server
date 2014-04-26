@@ -1,9 +1,6 @@
 {
   "name"   : "Joey Joe Joe Junior Shabadoo",
-  "tokens" : {
-    "RFID" : "0123456789",
-    "PIN"  : "1234"
-  },
+  "rfid" : "0123456789",
   "prepay" : {
     "balance" : 0,
     "timeout" : "YYYYMMDDHHMMSS"

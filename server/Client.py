@@ -5,14 +5,10 @@ import json
 
 from BaseHandler import BaseHandler
 
-# No need to change unless you've
-# extended the use of the profile.
-DEFAULT_PROFILE = {
-  'key':             None,
-  'handler':       'BaseHandler',
-  'handler_options': { 'path':   None,
-                       'create': None,
-                       'update': None }
+DEFAULT_CLIENT_PROFILE = {
+  'key': None,
+  'type': 'server.BaseHandler.BaseHandler',
+  'options': {}
 }
 
 def filename_for(client_id):
@@ -41,7 +37,7 @@ def load(profile_path):
     '''
 
     # Load the default profile
-    profile = DEFAULT_PROFILE.copy() 
+    profile = DEFAULT_CLIENT_PROFILE.copy() 
 
     # Update the default profile with the profile loaded from disk
     with open(profile_path, 'r') as f:
@@ -50,14 +46,14 @@ def load(profile_path):
     # Convert handler class name from string to a class
     if isinstance(profile['handler'], basestring):
         profile['handler'] = import_class(profile['type'])
-
+        
     # Validate profile
     validate(profile)
 
     return profile
 
 def import_class(full_name):
-    '''Imports class from module given full path.
+    '''Imports class from module given "full path" (base.module.class).
     '''
     module_name, class_name = full_name.rsplit('.', 1)
     return import_class(module_name, class_name)

@@ -6,53 +6,52 @@ import json
 from datetime import datetime
 
 from BaseClientHandler import *
+import user
 
 # TODO Logging functionality
 # TODO Database functionality
 
 class DoorbotHandler(BaseHandler):
-    '''Uses a flat-file log for the connected client.
-    '''
-    
+    ''' Handles Doorbot client communications.
+          - authentication
+          - logging of events
+    '''    
     def __init__(self, sock, session, **options):
         BaseHandler.__init__(self, sock, session, **options)
         
         self.NOW_FORMAT  = '%Y-%m-%d %H:%M:%S' # Timestamp format
         self.DATE_FORMAT = '%Y%m%d'            # Date format
-        self. authenticators = {
-          'rfid' : __authenticate_rfid
-        }
         
         # Unpack options
-        # ... logging options
-        self.log_directory = options['logging']
+        # ... logging directory
+        self.log_directory = options['log_directory']
+        # ... user profiles directory
+        self.users_directory = options['user_directory']
         
-        # ... authenticator options
-        self.authentication_options = options['authentication'] # ... type : options
+        # ... authenticator options (FUTURE)
+        #self.authenticators
+        #self.authentication_options = options['authentication'] # ... type : options
         
         # Register message types
         self.register_message_type('auth?', self.handle_authenticate, True)
-        self.register_message_type('cache?', self.handle_check_auth_cache, True)
 
     @classmethod
     def validate_options(cls, opts):
         # Validations for handler options
 
-        if not opts['log_path']:
-            raise ValueError('\'handler_options\': a file path (\'log_path\') is required.')
+        if not opts['log_directory']:
+            raise ValueError('client options: a log directory (\'log_directory\') is required.')
     
-        if not opts['rfid_path']:
-            raise ValueError('\'handler_options\': a file path (\'rfid_path\') is required.')
+        if not opts['users_directory']:
+            raise ValueError('client options: a users directory (\'users_directory\') is required.')
     
-    def __authenticate_rfid(self, data):
-        ''' Authenticates an RFID token for this client.
-            TODO put in own class/module?
-        '''
+    def __log_path_for_now(self):
+      return os.path.join(self.log_directory, '{date}.log'.format(date = datetime.now().strftime(self.DATE_FORMAT)))
     
-    def _log_it(self, message):
+    def __log(self, message):
       ''' Logs a message.
       '''
-      with open(self._log_path_for_now(), 'a') as f:
+      with open(self.__log_path_for_now(), 'a') as f:
         f.write('[{timestamp}] {message}\n'.format(timestamp = datetime.now().strftime(self.NOW_FORMAT),
                                                    message = message))
       
@@ -75,32 +74,20 @@ class DoorbotHandler(BaseHandler):
         auth_type, auth_data = parts[0], parts[1]
         
         # Test authentication
-        if self.authenticators.has_key(auth_type):
-          if self.authenticators[auth_type](auth_data):
-            on_authentication_success(auth_type, auth_data)
-          else:
-            on_authentication_failure(auth_type, auth_data)
-        else:
-          on_authentication_failure(auth_type, auth_data)
-        
-    def handle_check_auth_cache(self):
-        ''' Handles a cache-check message (cache?). This message allows
-            the client to test its cache for out-of-date/stale entries.
-            
-            TODO - age? db state token? full ask?
-        '''
-        pass
+        # TODO generalize for authenticators -- self.authenticators[auth_type](auth_data)
+        user_profile = user.find_by_auth_token(self.users_directory, auth_type, data)
 
-    def on_authentication_success(self, auth_type, auth_data):
+        if user_profile is not None:
+            send_authentication_response(True)
+            self.__log('Authentication success ({type}, {user})'.format(type = auth_type, user = user_profile['name']))
+        else:
+            send_authentication_response(False)
+            self.__log('Authentication failure ({type})'.format(type = auth_type))
+
+    def send_authentication_response(self, success):
         self.initialize_response_hmac()
-        self.send('OKAY', True)
+        if success:
+          self.send('OK', True)
+        else:
+          self.send('NO', True)
         self.finalize_response(True)
-        
-        self.log('')
-        
-    def on_authentication_failure(self, auth_type, auth_data):
-        self.initialize_response_hmac()
-        self.send('FAIL', True)
-        self.finalize_response(True)
-        
-        self.log('')

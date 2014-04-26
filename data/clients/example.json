@@ -2,6 +2,7 @@
   "key" : "secret123",
   "type" : "server.DoorbotHandler.DoorbotHandler",
   "options" : {
-    "users_directory" : "/path/to/users"
+    "users_directory" : "/path/to/users",
+    "logging_directory" : "/path/to/log"
   }
 }
